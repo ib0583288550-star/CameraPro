@@ -22,6 +22,7 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,6 +33,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -72,6 +76,9 @@ private fun CameraProScreen() {
     var exposure by remember { mutableFloatStateOf(0f) }
     var exposureMin by remember { mutableIntStateOf(0) }
     var exposureMax by remember { mutableIntStateOf(0) }
+    var focusX by remember { mutableFloatStateOf(0.5f) }
+    var focusY by remember { mutableFloatStateOf(0.5f) }
+    var showFocusControls by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("מוכן לצילום") }
     var savingToSd by remember { mutableStateOf(prefs.getBoolean("sd", false)) }
     var sdUri by remember { mutableStateOf(prefs.getString("tree", null)) }
@@ -132,6 +139,9 @@ private fun CameraProScreen() {
                             }, ContextCompat.getMainExecutor(ctx))
                             setOnTouchListener { view, event ->
                                 if (event.action == android.view.MotionEvent.ACTION_UP) {
+                                    focusX = (event.x / view.width.coerceAtLeast(1)).coerceIn(0f, 1f)
+                                    focusY = (event.y / view.height.coerceAtLeast(1)).coerceIn(0f, 1f)
+                                    showFocusControls = true
                                     val point: MeteringPoint = meteringPointFactory.createPoint(event.x, event.y)
                                     val action = FocusMeteringAction.Builder(point)
                                         .setAutoCancelDuration(3, TimeUnit.SECONDS).build()
@@ -144,6 +154,43 @@ private fun CameraProScreen() {
                     },
                     update = { }
                 ) }
+
+                if (showFocusControls) {
+                    BoxWithConstraints(Modifier.fillMaxSize()) {
+                        val density = LocalDensity.current
+                        val markerSize = with(density) { 46.dp.roundToPx() }
+                        val sliderWidth = with(density) { 48.dp.roundToPx() }
+                        val sliderHeight = with(density) { 148.dp.roundToPx() }
+                        val gapPx = with(density) { 12.dp.roundToPx() }
+                        val xPx = (focusX * constraints.maxWidth).toInt()
+                        val yPx = (focusY * constraints.maxHeight).toInt()
+                        val markerLeft = (xPx - markerSize / 2).coerceIn(0, (constraints.maxWidth - markerSize).coerceAtLeast(0))
+                        val markerTop = (yPx - markerSize / 2).coerceIn(0, (constraints.maxHeight - markerSize).coerceAtLeast(0))
+                        val sliderLeft = if (markerLeft + markerSize + gapPx + sliderWidth < constraints.maxWidth)
+                            markerLeft + markerSize + gapPx else (markerLeft - sliderWidth - gapPx).coerceAtLeast(0)
+                        val sliderTop = (yPx - sliderHeight / 2).coerceIn(0, (constraints.maxHeight - sliderHeight).coerceAtLeast(0))
+                        Box(Modifier.offset { IntOffset(markerLeft, markerTop) }.size(46.dp).border(2.dp, Color(0xFFFFD54F), CircleShape))
+                        Column(
+                            modifier = Modifier.offset { IntOffset(sliderLeft, sliderTop) }
+                                .size(width = 48.dp, height = 148.dp)
+                                .background(Color(0x990B1020), RoundedCornerShape(24.dp))
+                                .padding(vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.WbSunny, contentDescription = "בהירות", tint = Color(0xFFFFD54F), modifier = Modifier.size(18.dp))
+                            Slider(
+                                value = exposure.coerceIn(exposureMin.toFloat(), exposureMax.coerceAtLeast(exposureMin).toFloat()),
+                                onValueChange = {
+                                    exposure = it
+                                    camera?.cameraControl?.setExposureCompensationIndex(it.toInt())
+                                },
+                                valueRange = exposureMin.toFloat()..exposureMax.coerceAtLeast(exposureMin + 1).toFloat(),
+                                modifier = Modifier.width(128.dp).height(40.dp).rotate(270f)
+                            )
+                        }
+                    }
+                }
 
                 Column(Modifier.fillMaxSize().padding(18.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -165,21 +212,7 @@ private fun CameraProScreen() {
                     Column(
                         Modifier.fillMaxWidth().background(Color(0xCC101827), RoundedCornerShape(22.dp)).padding(horizontal=18.dp, vertical=12.dp)
                     ) {
-                        Text("חשיפה / תאורה", color = Color.White, style = MaterialTheme.typography.titleSmall)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.BrightnessLow, null, tint = Color.White)
-                            Slider(
-                                value = exposure,
-                                onValueChange = {
-                                    exposure = it
-                                    camera?.cameraControl?.setExposureCompensationIndex(it.toInt())
-                                },
-                                valueRange = exposureMin.toFloat()..exposureMax.coerceAtLeast(exposureMin + 1).toFloat(),
-                                modifier = Modifier.weight(1f)
-                            )
-                            Icon(Icons.Default.BrightnessHigh, null, tint = Color.White)
-                        }
-                        Text("גע בתמונה כדי למקד • זום ${"%.1f".format(zoom)}×", color = Color.White.copy(alpha=.8f), style = MaterialTheme.typography.labelSmall)
+                        Text("זום ${"%.1f".format(zoom)}×", color = Color.White, style = MaterialTheme.typography.labelSmall)
                         Slider(value=zoom, onValueChange={ zoom=it; camera?.cameraControl?.setZoomRatio(it) },
                             valueRange=1f..(camera?.cameraInfo?.zoomState?.value?.maxZoomRatio ?: 4f).coerceAtLeast(1f))
                     }
