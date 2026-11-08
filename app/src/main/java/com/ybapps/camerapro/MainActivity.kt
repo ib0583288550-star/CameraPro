@@ -88,7 +88,6 @@ private fun CameraProScreen() {
     var sdUri by remember { mutableStateOf(prefs.getString("tree", null)) }
     var showSettings by remember { mutableStateOf(false) }
     var showGrid by remember { mutableStateOf(prefs.getBoolean("grid", false)) }
-    var mirrorSelfies by remember { mutableStateOf(prefs.getBoolean("mirror", false)) }
     var focusAssist by remember { mutableStateOf(prefs.getBoolean("focus_assist", true)) }
     var keepScreenOn by remember { mutableStateOf(prefs.getBoolean("keep_screen", true)) }
     var showExposureValue by remember { mutableStateOf(prefs.getBoolean("exposure_value", true)) }
@@ -320,7 +319,6 @@ private fun CameraProScreen() {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("הצגת ערך החשיפה"); Switch(showExposureValue, { showExposureValue=it; prefs.edit().putBoolean("exposure_value",it).apply() }) }
                             Divider()
                             Text("צילום", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("שמירת סלפי במראה"); Switch(mirrorSelfies, { mirrorSelfies=it; prefs.edit().putBoolean("mirror",it).apply() }) }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("השארת המסך דולק"); Switch(keepScreenOn, { keepScreenOn=it; prefs.edit().putBoolean("keep_screen",it).apply() }) }
                             Text("מיקוד ידני: גע בתצוגה כדי למקד ולכוון חשיפה.", style = MaterialTheme.typography.bodySmall, color = Color.LightGray)
                             Divider()
