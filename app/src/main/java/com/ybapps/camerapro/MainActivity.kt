@@ -66,6 +66,7 @@ private fun CameraProScreen() {
     var camera by remember { mutableStateOf<Camera?>(null) }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var lens by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
+    var cameraSessionKey by remember { mutableIntStateOf(0) }
     var flash by remember { mutableStateOf(false) }
     var zoom by remember { mutableFloatStateOf(1f) }
     var exposure by remember { mutableFloatStateOf(0f) }
@@ -105,7 +106,7 @@ private fun CameraProScreen() {
             }
         } else {
             Box(Modifier.fillMaxSize().background(Color.Black)) {
-                AndroidView(
+                key(cameraSessionKey) { AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
                         PreviewView(ctx).apply {
@@ -142,7 +143,7 @@ private fun CameraProScreen() {
                         }
                     },
                     update = { }
-                )
+                ) }
 
                 Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.SpaceBetween) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -188,21 +189,8 @@ private fun CameraProScreen() {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                             IconButton(onClick = {
                                 lens = if (lens == CameraSelector.LENS_FACING_BACK) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
+                                cameraSessionKey++
                                 status = "מחליף מצלמה…"
-                                // Recreate preview binding by requesting activity recreation is avoided; update through selector below on next launch.
-                                val providerFuture = ProcessCameraProvider.getInstance(context)
-                                providerFuture.addListener({
-                                    try {
-                                        val provider = providerFuture.get()
-                                        val preview = Preview.Builder().build()
-                                        val capture = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).build()
-                                        provider.unbindAll()
-                                        val selector = CameraSelector.Builder().requireLensFacing(lens).build()
-                                        camera = provider.bindToLifecycle(lifecycleOwner, selector, preview, capture)
-                                        imageCapture = capture
-                                        status = "מוכן לצילום"
-                                    } catch (_: Exception) { status = "המצלמה הזו אינה זמינה" }
-                                }, ContextCompat.getMainExecutor(context))
                             }) { Icon(Icons.Default.Cameraswitch, null, tint=Color.White) }
                             IconButton(
                                 modifier = Modifier.size(78.dp).background(Color.White, CircleShape),
