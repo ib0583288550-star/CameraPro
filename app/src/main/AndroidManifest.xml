@@ -3,7 +3,7 @@
     <uses-feature android:name="android.hardware.camera.any" android:required="true"/>
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
-    <application android:allowBackup="true" android:label="Camera Pro" android:theme="@android:style/Theme.Material.NoActionBar" android:supportsRtl="true">
+    <application android:allowBackup="true" android:label="Camera Pro" android:icon="@drawable/ic_launcher" android:theme="@android:style/Theme.Material.NoActionBar" android:supportsRtl="true">
         <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="unspecified">
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity>
