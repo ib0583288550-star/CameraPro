@@ -145,7 +145,7 @@ private fun CameraProScreen() {
                     update = { }
                 ) }
 
-                Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                Column(Modifier.fillMaxSize().padding(18.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
                             Text("CAMERA PRO", color = Color.White, style = MaterialTheme.typography.titleLarge)
@@ -161,6 +161,7 @@ private fun CameraProScreen() {
                         }
                     }
 
+                    Spacer(Modifier.height(14.dp))
                     Column(
                         Modifier.fillMaxWidth().background(Color(0xCC101827), RoundedCornerShape(22.dp)).padding(horizontal=18.dp, vertical=12.dp)
                     ) {
@@ -183,6 +184,7 @@ private fun CameraProScreen() {
                             valueRange=1f..(camera?.cameraInfo?.zoomState?.value?.maxZoomRatio ?: 4f).coerceAtLeast(1f))
                     }
 
+                    Spacer(Modifier.weight(1f))
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                         Text(status, color = Color.White, style = MaterialTheme.typography.labelMedium)
                         Spacer(Modifier.height(8.dp))
