@@ -23,6 +23,10 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -83,6 +87,11 @@ private fun CameraProScreen() {
     var savingToSd by remember { mutableStateOf(prefs.getBoolean("sd", false)) }
     var sdUri by remember { mutableStateOf(prefs.getString("tree", null)) }
     var showSettings by remember { mutableStateOf(false) }
+    var showGrid by remember { mutableStateOf(prefs.getBoolean("grid", false)) }
+    var mirrorSelfies by remember { mutableStateOf(prefs.getBoolean("mirror", false)) }
+    var focusAssist by remember { mutableStateOf(prefs.getBoolean("focus_assist", true)) }
+    var keepScreenOn by remember { mutableStateOf(prefs.getBoolean("keep_screen", true)) }
+    var showExposureValue by remember { mutableStateOf(prefs.getBoolean("exposure_value", true)) }
 
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -97,6 +106,17 @@ private fun CameraProScreen() {
 
     LaunchedEffect(Unit) {
         if (!hasPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
+    }
+    LaunchedEffect(flash, camera) {
+        camera?.let { active ->
+            if (active.cameraInfo.hasFlashUnit()) {
+                try { active.cameraControl.enableTorch(flash) } catch (_: Exception) { status = "הפנס אינו זמין במצלמה הזו" }
+            } else if (flash) { flash = false; status = "אין פנס במצלמה שנבחרה" }
+        }
+    }
+    LaunchedEffect(keepScreenOn) {
+        if (keepScreenOn) (context as? ComponentActivity)?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        else (context as? ComponentActivity)?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     MaterialTheme(colorScheme = darkColorScheme(
@@ -139,9 +159,10 @@ private fun CameraProScreen() {
                             }, ContextCompat.getMainExecutor(ctx))
                             setOnTouchListener { view, event ->
                                 if (event.action == android.view.MotionEvent.ACTION_UP) {
-                                    focusX = (event.x / view.width.coerceAtLeast(1)).coerceIn(0f, 1f)
+                                    val normalizedX = (event.x / view.width.coerceAtLeast(1)).coerceIn(0f, 1f)
+                                    focusX = if (lens == CameraSelector.LENS_FACING_FRONT) 1f - normalizedX else normalizedX
                                     focusY = (event.y / view.height.coerceAtLeast(1)).coerceIn(0f, 1f)
-                                    showFocusControls = true
+                                    showFocusControls = focusAssist
                                     val point: MeteringPoint = meteringPointFactory.createPoint(event.x, event.y)
                                     val action = FocusMeteringAction.Builder(point)
                                         .setAutoCancelDuration(3, TimeUnit.SECONDS).build()
@@ -155,6 +176,17 @@ private fun CameraProScreen() {
                     update = { }
                 ) }
 
+                if (showGrid) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        val thirdX = size.width / 3f
+                        val thirdY = size.height / 3f
+                        val gridColor = Color.White.copy(alpha = 0.42f)
+                        drawLine(gridColor, Offset(thirdX, 0f), Offset(thirdX, size.height), 1.dp.toPx())
+                        drawLine(gridColor, Offset(thirdX * 2, 0f), Offset(thirdX * 2, size.height), 1.dp.toPx())
+                        drawLine(gridColor, Offset(0f, thirdY), Offset(size.width, thirdY), 1.dp.toPx())
+                        drawLine(gridColor, Offset(0f, thirdY * 2), Offset(size.width, thirdY * 2), 1.dp.toPx())
+                    }
+                }
                 if (showFocusControls) {
                     BoxWithConstraints(Modifier.fillMaxSize()) {
                         val density = LocalDensity.current
@@ -173,12 +205,14 @@ private fun CameraProScreen() {
                         Column(
                             modifier = Modifier.offset { IntOffset(sliderLeft, sliderTop) }
                                 .size(width = 48.dp, height = 148.dp)
-                                .background(Color(0x990B1020), RoundedCornerShape(24.dp))
+                                .background(Color(0xE6101728), RoundedCornerShape(24.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(24.dp))
                                 .padding(vertical = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            Icon(Icons.Default.WbSunny, contentDescription = "בהירות", tint = Color(0xFFFFD54F), modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.WbSunny, contentDescription = "חשיפה", tint = Color(0xFFFFD54F), modifier = Modifier.size(18.dp))
+                            if (showExposureValue) Text("%+.1f".format(exposure), color = Color.White.copy(alpha=.8f), style = MaterialTheme.typography.labelSmall)
                             Slider(
                                 value = exposure.coerceIn(exposureMin.toFloat(), exposureMax.coerceAtLeast(exposureMin).toFloat()),
                                 onValueChange = {
@@ -186,7 +220,8 @@ private fun CameraProScreen() {
                                     camera?.cameraControl?.setExposureCompensationIndex(it.toInt())
                                 },
                                 valueRange = exposureMin.toFloat()..exposureMax.coerceAtLeast(exposureMin + 1).toFloat(),
-                                modifier = Modifier.width(128.dp).height(40.dp).rotate(270f)
+                                modifier = Modifier.width(128.dp).height(36.dp).rotate(270f),
+                                colors = SliderDefaults.colors(thumbColor = Color(0xFFFFD54F), activeTrackColor = Color(0xFFFFD54F), inactiveTrackColor = Color.White.copy(alpha=.22f))
                             )
                         }
                     }
@@ -199,7 +234,7 @@ private fun CameraProScreen() {
                             Text(if (savingToSd) "שמירה: כרטיס זיכרון" else "שמירה: זיכרון פנימי", color = Color.White.copy(alpha=.75f), style = MaterialTheme.typography.labelMedium)
                         }
                         Row {
-                            IconButton(onClick = { flash = !flash }) {
+                            IconButton(onClick = { flash = !flash; status = if (!flash) "הפנס הופעל" else "הפנס כובה" }) {
                                 Icon(if (flash) Icons.Default.FlashOn else Icons.Default.FlashOff, null, tint = Color.White)
                             }
                             IconButton(onClick = { showSettings = true }) {
@@ -276,9 +311,20 @@ private fun CameraProScreen() {
             if (showSettings) {
                 AlertDialog(
                     onDismissRequest = { showSettings = false },
-                    title = { Text("הגדרות שמירה") },
+                    title = { Text("הגדרות מצלמה") },
                     text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("תצוגה ומיקוד", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("רשת קומפוזיציה 3×3"); Switch(showGrid, { showGrid=it; prefs.edit().putBoolean("grid",it).apply() }) }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("סיוע מיקוד ומחוון חשיפה"); Switch(focusAssist, { focusAssist=it; prefs.edit().putBoolean("focus_assist",it).apply(); if (!it) showFocusControls=false }) }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("הצגת ערך החשיפה"); Switch(showExposureValue, { showExposureValue=it; prefs.edit().putBoolean("exposure_value",it).apply() }) }
+                            Divider()
+                            Text("צילום", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("שמירת סלפי במראה"); Switch(mirrorSelfies, { mirrorSelfies=it; prefs.edit().putBoolean("mirror",it).apply() }) }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("השארת המסך דולק"); Switch(keepScreenOn, { keepScreenOn=it; prefs.edit().putBoolean("keep_screen",it).apply() }) }
+                            Text("מיקוד ידני: גע בתצוגה כדי למקד ולכוון חשיפה.", style = MaterialTheme.typography.bodySmall, color = Color.LightGray)
+                            Divider()
+                            Text("מיקום שמירה", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                             Text("בחר היכן לשמור תמונות")
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 RadioButton(selected=!savingToSd, onClick={ savingToSd=false; prefs.edit().putBoolean("sd",false).apply() })
